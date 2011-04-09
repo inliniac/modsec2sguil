@@ -1,0 +1,120 @@
+modsec2sguil
+============
+Written by Victor Julien <victor@inliniac.net>
+
+
+What is it?
+-----------
+It is a set of Perl scripts that enables you to add ModSecurity alerts to
+go into the Sguil NSM system. It acts as an agent to Sguil.
+
+
+Required software
+-----------------
+- Apache2
+- ModSecurity 2 (1.9.4 may work but is untested)
+- Sguil 0.7 server
+- Perl
+- IO::Socket::SSL library (on Debian/Ubuntu libio-socket-ssl-perl package)
+
+
+Install/Usage
+-------------
+
+- Create a user to run the agent as -
+
+Add a user with the following command:
+# useradd -u 400 -d /home/sguil sguil
+
+This creates a user called sguil. The specific uid is given so transfering
+files between different sensors is easier. It is not required. Choose an
+uid that is not already in use.
+
+
+- Installation of files - 
+
+You can place the two binary files (the .pl ones) anywhere you want. Since
+I like having all files together I'm putting them in /nsm/bin. Place the
+modsec_agent.conf in /nsm/etc
+
+The two libraries (the .pm files) should be in /usr/lib/perl5/ (or use
+a symlink for that.
+
+
+- Agent configuration -
+
+Modsec2sguil uses a configuation file that uses the same syntax as Sguil
+agents. Take the example configution file and adapt it to your needs. It
+is advisable to enable debugging and disable daemon mode while testing.
+
+Set the RUNAS variable to the user you created above.
+
+This doc assumes the configfile is placed in /nsm/etc
+
+
+- Apache2 setup -
+
+The following asumes your Apache2 logs to /var/log/apache2/ and
+that ModSecurity2 concurrent logging will log to /var/log/apache2/audit_log/data/
+
+Step 1. Creating a queue directory.
+
+modsec_queue.pl adds the events to the queue directory so modsec_agent.pl can
+process them in the right order. The directory can be anywhere but note that
+when you intend to run modsec_agent.pl under reduced privileges (which is
+highly recommended) the directory and it's parents need to be owned by the
+user you want to run the agent as.
+
+Create the directory /nsm/queue and set the correct permissions on it:
+chown sguil /nsm -R
+
+Step 2. Setup the Apache2/ModSecurity2 config
+
+Put the following lines in your Apache2/ModSecurity2 configuration:
+
+SecAuditLogType Concurrent
+SecAuditLogStorageDir /var/log/apache2/audit_log/data/
+SecAuditLog "|/path/to/modsec_queue.pl -c /nsm/etc/modsec_agent.conf /var/log/apache2/audit_log/data/ /var/log/apache2/audit_log/index"
+SecAuditLogParts ABCDEFGHZ
+
+NOTE: the SecAuditLog line changed from previous version of modsec2sguil!
+
+Restart apache2. You should see event files appear in the queue directoy.
+Depending on your setup they might appear on simple webserver visits or
+you might have to run a tool like nikto to trigger events.
+
+Look at you apache2 error log for any errors.
+
+
+- Putting it together -
+
+Next, use modsec_agent.pl to connect to Sguil. It is run as follows:
+modsec_agent.pl -c /nsm/etc/modsec_agent.conf
+
+The script enters an endless loop in which it will continuesly check for new
+alert files in the queue dir. Press Ctrl-C to kill it. If everything works
+fine, you can enable daemon mode.
+
+
+Support
+-------
+Mail me at <victor@inliniac.net> or hop in #snort-gui at
+irc.freenode.net. I'm using the nick VictorJ.
+
+
+Future plans / known limitations
+-------------------------------
+Better error checking.
+Enable a way to log when running in daemon mode.
+More docs.
+Think of a name for this little project ;-)
+
+
+Special thanks to
+-----------------
+Ivan Ristic of Breach Security for releasing modsec-auditlog-collector.pl as GPL.
+And for creating ModSecurity of course!
+
+Bamm Visscher for answering my endless questions. Of course, Sguil rocks,
+so thanks for that as well.
+

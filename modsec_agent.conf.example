@@ -1,0 +1,70 @@
+#
+# Configuration file for modsec2sguil
+#
+
+# DEBUG is VERY chatty. Use it only when needed.
+# 1=on 0=off
+set DEBUG 1
+
+# Run in background
+# 1=yes 0=no
+set DAEMON 0
+
+# Name of sguild server
+set SERVER_HOST 192.168.1.100
+
+# Port sguild listens on for sensor connects
+set SERVER_PORT 7736
+
+# Local hostname - that means this machines name
+set HOSTNAME webserver
+
+# The net group is used to correlate data from different agents. This name
+# should match the name of the pcap_agent.
+set NET_GROUP webfarm
+
+# Directory containing the ModSecurity events. Set to an absolute path if you
+# have set DAEMON to 1.
+set EVENT_DIR /nsm/queue
+
+# Enable SSL communication with the server. Recommended, but enable only
+# if you run the server in SSL mode.
+#
+# Set to 1 to enable, 0 to disable (default)
+set OPENSSL 0
+
+# Set the userid to runas. Leave empty to run as the
+# user that starts the script.
+set RUNAS sguil
+
+# Sensor type. No need to change this normally.
+set SENSOR_TYPE modsecurity
+
+# Keep a heartbeat going w/PING PONG. Value is in miliseconds,
+# however the precision of the agent is in seconds. The value
+# of 300000 means 300 seconds or 5 minutes.
+set PING_DELAY 300000
+
+# Ignore certain HTTP codes. By default modsec2sguil treats every http code
+# of 400 and higher as an alerts, but not all codes are. For example the code
+# 404 (not found) is normally not a ModSecurity alert.
+# 
+# Syntax: space separated list of codes.
+set IGNORE_HTTP_CODES 404
+
+# Send all events, so non-alerts as well, to Sguil. This logs all HTTP
+# transactions to Sguil. To prevent the non-alerts from appearing in
+# the Sguil interface make sure to add the following lines to the servers
+# autocat.conf:
+#
+# none||ANY||ANY||ANY||ANY||ANY||ANY||%%REGEXP%%^MSc [1-3][0-9][0-9]||1
+# none||ANY||ANY||ANY||ANY||ANY||ANY||%%REGEXP%%^MSc 404||1
+#
+# Note that any codes set in IGNORE_HTTP_CODES are not send to Sguil.
+#
+# Set to 1 to enable, 0 to disable (default)
+set HANDLE_ALL_EVENTS 0
+
+# Syslog facility
+#
+set SYSLOGFACILITY daemon

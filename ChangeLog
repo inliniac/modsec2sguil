@@ -1,0 +1,56 @@
+ChangeLog for Modsec2sguil
+
+Version 0.8-dev8
+
+- Fix parsing of lines with multiple 'tag' entries.
+
+Version 0.8-dev7 March 26th,2008
+
+- Update protocol string to reflect Sguil 0.7.0 stable release
+- Support ModSecurity 2.5.x, thanks for the addition Ryan Cummings
+
+Version 0.8-dev6 September 18th, 2007
+
+- Catch errors in syslog so they will be non-fatal.
+- Fix broken syslog level.
+
+Version 0.8-dev5 August 19th, 2007
+
+- Add syslog logging.
+- Add option to log all transactions, not just alerts.
+
+Version 0.8-dev4 August 16th, 2007
+
+- Fix a bug where the agent would exit if the connection to the server was
+  lost.
+
+Version 0.8-dev3 August 16th, 2007
+
+- Make sure alerts get prio 1-4, non-alerts prio 5.
+- Clean up SguilAgent.pm rtgenevent function.
+- Fix rule id being part of the event.
+- Add option to send all http events to Sguil, even non-alerts.
+
+Version 0.8-dev2 August 14th, 2007
+
+- Fix missing RUNAS van causing a error message.
+- Add an option IGNORE_HTTP_CODES to the config, to optionally no treat
+  certain codes as alerts, and thus not send them to Sguil.
+- Fix PINGs sending duplicate \r\n
+
+Version 0.8-dev1 August 13th, 2007
+
+- Converted into a real agent for Sguil 0.7 (no more barnyard replacement)
+- Agent can drop privileges
+- Agent can daemonize
+- Pinging the server is supported
+- The agent reconnects to the server if the connection is lost
+- Agent supports SSL for the connection to the server
+- A sguil-compatible configuration file is now used
+- A debug mode was added
+
+Version 0.7 March 18th, 2007
+
+- add support for ModSecurity 2.x alerts.
+- fix wrong severity to prio conversion.
+
