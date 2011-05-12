@@ -33,8 +33,8 @@ set EVENT_DIR /nsm/queue
 # Set to 1 to enable, 0 to disable (default)
 set OPENSSL 0
 
-# Set the userid to runas. Leave empty to run as the
-# user that starts the script.
+# Set the username to run as. Leave empty to run as the
+# user that starts the script. To set both user and group use "user:group".
 set RUNAS sguil
 
 # Sensor type. No need to change this normally.
@@ -68,3 +68,13 @@ set HANDLE_ALL_EVENTS 0
 # Syslog facility
 #
 set SYSLOGFACILITY daemon
+
+# Symlink: use symlinks instead of hardcopies in the queue
+set SYMLINK 0
+
+# Remove the original file at the same time as the symlink.
+# Only use this if you have no need to keep the ModSecurity records.
+# Make sure you the user at RUNAS has permissions to remove the files,
+# it's recommended to use the same user as Apache, e.g. www-data for Debian.
+set SYMLINK_REMOVE_ORIG 0
+

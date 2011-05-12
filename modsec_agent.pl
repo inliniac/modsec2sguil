@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2006-2007 by Victor Julien <victor@inliniac.net>
+# Copyright (C) 2006-2011 by Victor Julien <victor@inliniac.net>
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ use SguilAgent;
 use strict "vars";
 use strict "subs";
 
-my $version = "0.8-dev7";
+my $version = "0.8-dev8";
 my $license = "GNU GPLv2. See http://www.gnu.org/licenses/gpl2.txt for more information";
 
 #
@@ -66,19 +66,19 @@ sub ConvertSEVERITYtoPRIO
 {
     my $severity = shift @_;
 
-    my %sev = (	"EMERGENCY" => 1,
+    my %sev = ( "EMERGENCY" => 1,
                 "ALERT"     => 1,
                 "CRITICAL"  => 2,
-                "ERROR"	    => 2,
+                "ERROR"     => 2,
                 "WARNING"   => 3,
                 "NOTICE"    => 3,
                 "INFO"      => 4,
-                "DEBUG"	    => 4 );
+                "DEBUG"     => 4 );
 
     if (not defined $sev{$severity}) {
         return 4; # default to 4 which is the lowest we use for alerts
     }
-	
+
     return $sev{$severity};
 }
 
@@ -89,7 +89,7 @@ sub ConvertMONTHSTRtoDEC
     my %mon = ( "Jan" => 1, "Feb" => 2, "Mar" => 3, "Apr" => 4,
                 "May" => 5, "Jun" => 6, "Jul" => 7, "Aug" => 8,
                 "Sep" => 9, "Oct" => 10,"Nov" => 11,"Dec" => 12 );
-	
+
     if (not defined $mon{$monthstr}) {
         return -1;
     }
@@ -107,7 +107,7 @@ sub ConvertIPtoDEC
 
     ( my $one , my $two , my $three , my $four ) = split(/\./, $ip);
     my $dec = $one * 16777216 + $two * 65536 + $three * 256 + $four;
-	
+
     return($dec);
 }
 
@@ -122,8 +122,8 @@ sub ConvertIPtoDEC
 #
 # This function is only called for actual alerts.
 #
-# Returns:	-1 on error
-# 		0 on success
+# Returns:  -1 on error
+#       0 on success
 #
 sub PreprocessAlert
 {
@@ -133,7 +133,7 @@ sub PreprocessAlert
     #
     # SECTION A
     #
-	
+
     # stupid trick to convert month(str) to month(dec)
     my $month = ConvertMONTHSTRtoDEC $ref->{"monthstr"};
     if ($month != -1) {
@@ -156,7 +156,7 @@ sub PreprocessAlert
 
     # get the unixtime in gm, month is from 0 to 11.
     my $time = timegm($sec,$min,$hour,$ref->{"day"},$ref->{"month"}-1,$ref->{"year"});
-					
+
     # parse the timezone offset. It looks like +0200 or -0100
     $_ = $ref->{"tz"};
     my @parse = /(.{1})(\d{2})(\d{2})$/;
@@ -219,7 +219,7 @@ sub PreprocessAlert
     #
     # SECTION H
     #
-	
+
     # check for a message with a message, get it?
     if( defined( $ref->{"themsg"} ) ) {
         #print "themsg: " .  $ref->{"themsg"} . "\n";
@@ -248,7 +248,7 @@ sub PreprocessAlert
         $ref->{"class"} = "web-application-attack";
         $ref->{"prio"} = ConvertSEVERITYtoPRIO $ref->{"severity"};
     }
-	
+
     # Event message
     if ((not defined $ref->{"themsg"}) || ($ref->{"themsg"} eq "")) {
         $ref->{"themsg"} = $ref->{"http_response_reason_phrase"};
@@ -260,13 +260,19 @@ sub PreprocessAlert
 
     # hex the payload
     $ref->{"payload"} = ConvertASCIItoHEX $ref->{"file"};
-	
+
     return 0;
 }
 
-# tries to drop privs to $user
+# tries to drop privs to $string
+# $string can be either "user" or "user:group"
 sub RunAs {
-    my $user = shift @_;
+    my $string = shift @_;
+
+    my $user;
+    my $group;
+
+    ($user, $group) = split(/:/, $string, 2);
 
     if (not defined $user) {
         return;
@@ -290,7 +296,16 @@ sub RunAs {
         return;
     }
 
+    my $newgid = $(;
+    if (defined $group && $group ne "") {
+        $newgid = getgrnam($group);
+        if (not defined $newgid) {
+            die "getgrnam for $group failed";
+        }
+    }
+
     # set the new uid
+    $( = $) = $newgid;
     $< = $> = $newuid;
 
     return;
@@ -317,10 +332,9 @@ sub Daemonize
 sub GetAlertFiles {
     my $dir = shift;
     #print $dir . "\n";
-	
+
     my $dh = DirHandle->new($dir) or die "can't open dir $dir: $!\n";
     return sort
-           grep { -f        }
            grep { /^$dir\/modsec\.log\..*/ } # we want only the files that start with modsec.log.
            map  { "$dir/$_" }
            grep { !/^\./    }
@@ -340,6 +354,8 @@ my $g_event_dir;
 my $g_runas = "";
 my $g_debug = 0;
 my $g_daemon = 0;
+my $g_symlink = 0;
+my $g_symlink_rm_orig = 0;
 
 # fill the g_ignore_http_codes hash
 sub GetIgnoreCodes {
@@ -387,43 +403,77 @@ sub process_events {
             # parse each file and check if it really was an alert
             foreach my $file (@list) {
                 $sguil->debuglog ( "Eventfile found: $file." );
+                my $valid = 0;
 
-                # get a ModsecAlert object
-                my $alert = new ModsecAlert;
-
-                # parse the alert file
-                eval { $alert->parsefile( $file ) };
-                if ($@) {
-                    die $@;
-                }
-
-                # get a copy from the hash of the alert
-                my %event_hash = %{$alert->getalerthash()};
-                # create a reference to work with
-                my $hash_ref = \%event_hash;
-
-                # Determine if we will continue processing the event.
-                #
-                if (exists($event_hash{"code"}) &&
-                    ($event_hash{"code"} ge 400 || $g_handle_all_events == 1) &&
-                    TestIgnoreCode($event_hash{"code"}) == 0)
-                {
-                    # preprocess the data so it becomes what Sguil expects
-                    if ( PreprocessAlert ( $hash_ref ) == 0 ) {
-                        $sguil->debuglog ( "Processing Event \"" . $event_hash{"themsg"} . "\"" );
-			
-                        # send the event as a GenericEvent to Sguild
-                        eval { $sguil->rtgenevent( $hash_ref ) };
-                        if ($@) {
-                            die $@;
-                        }
-
-                        # increase the cid so the next event gets it's uniq cid.
-                        $sguil->incrcid();
-
-                        $sguil->debuglog ( "Event accepted by server." );
+                if (-l $file) {
+                    my $real_file = readlink($file);
+                    $sguil->debuglog ( "Symlink $file to $real_file." );
+                    if (-r $real_file) {
+                        $valid = 1;
+                    } else {
+                        $sguil->debuglog ( "real file doesn't exist" );
+                    }
+                } else {
+                    if(-r $file) {
+                        $valid = 1;
+                    } else {
+                        $sguil->debuglog ( "file doesn't exist" );
                     }
                 }
+
+                if ($valid == 1) {
+                    # get a ModsecAlert object
+                    my $alert = new ModsecAlert;
+
+                    # parse the alert file
+                    eval { $alert->parsefile( $file ) };
+                    if ($@) {
+                        die $@;
+                    }
+
+                    # get a copy from the hash of the alert
+                    my %event_hash = %{$alert->getalerthash()};
+                    # create a reference to work with
+                    my $hash_ref = \%event_hash;
+
+                    # Determine if we will continue processing the event.
+                    #
+                    if (exists($event_hash{"code"}) &&
+                            ($event_hash{"code"} ge 400 || $g_handle_all_events == 1) &&
+                            TestIgnoreCode($event_hash{"code"}) == 0)
+                    {
+                        # preprocess the data so it becomes what Sguil expects
+                        if ( PreprocessAlert ( $hash_ref ) == 0 ) {
+                            $sguil->debuglog ( "Processing Event \"" . $event_hash{"themsg"} . "\"" );
+
+                            # send the event as a GenericEvent to Sguild
+                            eval { $sguil->rtgenevent( $hash_ref ) };
+                            if ($@) {
+                                die $@;
+                            }
+
+                            # increase the cid so the next event gets it's uniq cid.
+                            $sguil->incrcid();
+
+                            $sguil->debuglog ( "Event accepted by server." );
+                        }
+                    }
+                } else {
+                    print "removing invalid file\n";
+                }
+
+                if ($g_symlink == 1 && $g_symlink_rm_orig == 1) {
+                    my $orig_file = readlink($file);
+                    if ( $orig_file ne "") {
+                        $sguil->debuglog ( "Original file to remove: $orig_file" );
+
+                        my $rem = unlink ($orig_file);
+                        if ($rem != 1 ) {
+                            $sguil->warninglog ( "warning could not remove $orig_file: $!" );
+                        }
+                    }
+                }
+
                 my $removed = unlink ($file);
                 if ($removed != 1 ) {
                     # fatal error, because we keep processing the same
@@ -447,7 +497,7 @@ if ( defined $option{v} ) {
     my $modsec = new ModsecAlert;
     print "\n";
     print "modsec_agent.pl version $version (ModsecAlert.pm " . $modsec->version() . ", SguilAgent.pm " . $sguil->version() . ").\n\n";
-    print "Copyright (c) 2006-2007 by Victor Julien <victor\@inliniac.net>.\n";
+    print "Copyright (c) 2006-2011 by Victor Julien <victor\@inliniac.net>.\n";
     print "Released under $license.\n";
     print "\n";
     exit 0;
@@ -481,6 +531,14 @@ if ($@ || $g_event_dir eq "") {
 }
 
 
+eval { $g_symlink = $sguil->getvar ("SYMLINK") };
+if ($@ || $g_symlink eq "") {
+    $g_symlink = 0;
+}
+eval { $g_symlink_rm_orig = $sguil->getvar ("SYMLINK_REMOVE_ORIGINAL") };
+if ($@ || $g_symlink_rm_orig eq "") {
+    $g_symlink_rm_orig = 0;
+}
 eval { $g_handle_all_events = $sguil->getvar ("HANDLE_ALL_EVENTS") };
 if ($@ || $g_handle_all_events eq "") {
     $g_handle_all_events = 0;
@@ -522,7 +580,7 @@ while (1) {
 
     eval { process_events($g_event_dir) };
     if ($@) {
-        $sguil->errorlog ( "processing events failed $@" );
+        $sguil->errorlog ( "processing events failed: $@" );
     }
 
     eval { $sguil->disconnect() };

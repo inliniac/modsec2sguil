@@ -205,7 +205,7 @@ sub parsefile {
             # Thanks to Ryan Cummings.
             elsif ( m/^Message\: Access denied with code \d+ \(phase \d\)\. .*\[severity \"\S+\"\] (\[tag \"(\S+)\"\])?/ )
             {
-                my @parsed_line = /^Message\: Access denied with code (\d+) \(phase \d\)\. (.*) \[severity \"(\S+)\"\] (\[tag \"(\S+)\"\])?/;
+                my @parsed_line = /^Message\: Access denied with code (\d+) \(phase \d\)\. (.*) \[severity \"(\S+)\"\] (\[tag \"(\S+)\"\])?$/;
                 if ( @parsed_line == 0 ) {
                     goto error;
                 } else {

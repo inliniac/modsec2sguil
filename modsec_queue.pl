@@ -3,7 +3,7 @@
 # ModSecurity for Apache (http://www.modsecurity.org)
 # Copyright (c) 2002-2006 Thinking Stone (http://www.thinkingstone.com)
 #
-# Modified for use with Sguil by Victor Julien <victor@inliniac.net> (c) 2006-2007
+# Modified for use with Sguil by Victor Julien <victor@inliniac.net> (c) 2006-2011
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@ if ( defined $option{v} ) {
     print "\n";
     print "modsec_queue.pl version $version.\n\n";
     print "Copyright (c) 2002-2006 Breach Security Inc.\n";
-    print "Copyright (c) 2006-2007 Victor Julien <victor\@inliniac.net>\n";
+    print "Copyright (c) 2006-2011 Victor Julien <victor\@inliniac.net>\n";
     print "Release under $license.\n";
     print "\n";
     exit 0;
@@ -102,24 +102,37 @@ if ($@) {
 }
 
 # username to chown the event files to
-my $username;
+my $runas;
 my $uid;
 my $gid;
 my $event_dir;
+my $g_symlink;
 
-eval { $username = $sguil->getvar("RUNAS") };
+eval { $runas = $sguil->getvar("RUNAS") };
 if ($@) {
-    $username = "";
+    $runas = "";
 } else {
-    eval { $uid = getpwnam ($username) };
-    if ($@) {
-        $sguil->errorlog ( "FATAL ERROR: couldn't get UID for $username: $@" );
+    my $user;
+    my $group;
+
+   ($user, $group) = split(/:/, $runas, 2);
+
+    if (not defined $user) {
+        $sguil->errorlog ( "FATAL ERROR: couldn't parse $runas: $@" );
         exit 1;
     }
-    eval { $gid = getgrnam ($username) };
+
+    eval { $uid = getpwnam ($user) };
     if ($@) {
-        $sguil->errorlog ( "FATAL ERROR: couldn't get GID for $username: $@" );
+        $sguil->errorlog ( "FATAL ERROR: couldn't get UID for $user: $@" );
         exit 1;
+    }
+    if (defined $group) {
+        eval { $gid = getgrnam ($group) };
+        if ($@) {
+            $sguil->errorlog ( "FATAL ERROR: couldn't get GID for $group: $@" );
+            exit 1;
+        }
     }
 }
 
@@ -127,6 +140,10 @@ eval { $event_dir = $sguil->getvar("EVENT_DIR") };
 if ($@) {
     print "FATAL ERROR: EVENT_DIR not defined in " . $option{c} . "\n";
     exit 1;
+}
+eval { $g_symlink = $sguil->getvar ("SYMLINK") };
+if ($@ || $g_symlink eq "") {
+    $g_symlink = 0;
 }
 
 my($folder, $index) = @ARGV;   
@@ -194,12 +211,29 @@ while (<STDIN>) {
         my $src = $folder . $request{"filename"};
         my $dst = $event_dir . "/modsec.log." . $t_sec . "." . $t_usec;
 
-        if ( link ( $src , $dst ) == 0 ) {
-            $sguil->warninglog ( "failed to create symlink between $src and $dst" );
-        }
+        if ($g_symlink == 1) {
+            if ( symlink ( $src , $dst ) == 0 ) {
+                $sguil->warninglog ( "failed to create symlink between $src and $dst" );
+            }
 
-        if ( $username ne "" ) {
-            chown ($uid,0,$dst);
+            if ( $runas ne "" ) {
+                # chown the src as the dst is the symlink itself
+                eval { chown ($uid,$gid,$src) };
+                if ($@) {
+                    die $@;
+                }
+            }
+        } else {
+            if ( link ( $src , $dst ) == 0 ) {
+                $sguil->warninglog ( "failed to create (hard)link between $src and $dst" );
+            }
+
+            if ( $runas ne "" ) {
+                eval { chown ($uid,$gid,$dst) };
+                if ($@) {
+                    die $@;
+                }
+            }
         }
     }
 }
