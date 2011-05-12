@@ -464,7 +464,7 @@ sub process_events {
 
                 if ($g_symlink == 1 && $g_symlink_rm_orig == 1) {
                     my $orig_file = readlink($file);
-                    if ( $orig_file ne "") {
+                    if (defined $orig_file && $orig_file ne "") {
                         $sguil->debuglog ( "Original file to remove: $orig_file" );
 
                         my $rem = unlink ($orig_file);
