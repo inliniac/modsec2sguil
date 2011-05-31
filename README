@@ -12,8 +12,8 @@ go into the Sguil NSM system. It acts as an agent to Sguil.
 Required software
 -----------------
 - Apache2
-- ModSecurity 2 (1.9.4 may work but is untested), tested up to 2.6.0rc2.
-- Sguil 0.7 server
+- ModSecurity 2 (1.9.4 may work but is untested), tested up to 2.6.0.
+- Sguil 0.8.0 server
 - Perl
 - IO::Socket::SSL library (on Debian/Ubuntu libio-socket-ssl-perl package)
 
