@@ -42,7 +42,7 @@ use diagnostics;
 use strict "vars";
 use strict "subs";
 
-my $version = "0.8-dev7";
+my $version = "0.8";
 my $license = "GNU GPLv2. See http://www.gnu.org/licenses/gpl2.txt for more information";
 
 # ---------------------------------------------------

@@ -21,7 +21,7 @@
 # Object for parsing ModSecurity autitlog event files.
 #
 
-my $version = "0.8-dev7";
+my $version = "0.8";
 package ModsecAlert;
 
 use fields qw (	store );

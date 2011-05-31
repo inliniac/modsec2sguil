@@ -21,7 +21,7 @@
 # Object for communication between an agent and the Sguild server.
 #
 
-my $version = "0.8-dev7";
+my $version = "0.8";
 package SguilAgent;
 
 use fields qw ( sock sid cid select cnf pingwait pingint syslog syslogfacility );
@@ -106,9 +106,9 @@ sub connect {
     # send our version
     my $version;
     if ( $ssl == 1 ) {
-        $version = "SGUIL-0.7.0 OPENSSL ENABLED";
+        $version = "SGUIL-0.8.0 OPENSSL ENABLED";
     } else {
-        $version = "SGUIL-0.7.0 OPENSSL DISABLED";
+        $version = "SGUIL-0.8.0 OPENSSL DISABLED";
     }
 
     if ($version ne $resp) {

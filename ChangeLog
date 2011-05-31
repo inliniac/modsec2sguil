@@ -1,5 +1,9 @@
 ChangeLog for Modsec2sguil
 
+Version 0.8
+
+- Send/expect 0.8.0 identifier from/to server.
+
 Version 0.8-dev8
 
 - Fix parsing of lines with multiple 'tag' entries.
